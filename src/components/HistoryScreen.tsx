@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -16,7 +17,14 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  CircularProgress,
+  Snackbar,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { format, parse } from 'date-fns';
 import { FeedingSession, DiaperEvent, TrackingData, DayData } from '../types';
@@ -24,7 +32,7 @@ import { storageService } from '../services/storage';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
-import { Download as DownloadIcon, Backup as BackupIcon, Description as JsonIcon, TableChart as CsvIcon, PictureAsPdf as PdfIcon } from '@mui/icons-material';
+import { Download as DownloadIcon, Backup as BackupIcon, Description as JsonIcon, TableChart as CsvIcon, PictureAsPdf as PdfIcon, Upload as UploadIcon } from '@mui/icons-material';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -32,16 +40,40 @@ const HistoryScreen = () => {
   const theme = useTheme();
   const [data, setData] = useState<TrackingData | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notification, setNotification] = useState<{
+    open: boolean;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    type: 'success'
+  });
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const loadData = () => {
-      const storedData = storageService.getData();
-      setData(storedData);
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const storedData = await storageService.getData();
+        setData(storedData);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
     loadData();
+    
     // Add event listener for storage changes
-    window.addEventListener('storage', loadData);
-    return () => window.removeEventListener('storage', loadData);
+    const handleStorageChange = () => {
+      loadData();
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const formatTime = (timeStr: string) => {
@@ -99,7 +131,7 @@ const HistoryScreen = () => {
     handleMenuClose();
   };
 
-  const handleExportJson = () => {
+  const handleExportJson = async () => {
     if (!data) return;
     const dataStr = JSON.stringify(data, null, 2);
     downloadFile(
@@ -109,7 +141,7 @@ const HistoryScreen = () => {
     );
   };
 
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
     if (!data) return;
     
     // Create CSV header
@@ -199,6 +231,52 @@ const HistoryScreen = () => {
     handleMenuClose();
   };
 
+  const handleRestore = () => {
+    setRestoreDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleRestoreConfirm = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const restoredData = JSON.parse(text);
+      
+      // Validate the data structure
+      if (typeof restoredData !== 'object') throw new Error('Invalid data format');
+      
+      await storageService.restoreData(restoredData);
+      
+      // Reload the data
+      const newData = await storageService.getData();
+      setData(newData);
+      
+      setNotification({
+        open: true,
+        message: 'Data restored successfully',
+        type: 'success'
+      });
+    } catch (error) {
+      console.error('Error restoring data:', error);
+      setNotification({
+        open: true,
+        message: 'Error restoring data. Please make sure the file is valid.',
+        type: 'error'
+      });
+    } finally {
+      setRestoreDialogOpen(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleCloseNotification = () => {
+    setNotification(prev => ({ ...prev, open: false }));
+  };
+
   const renderEvent = (event: FeedingSession | DiaperEvent) => {
     if ('dogadjaj' in event) {
       // Diaper event
@@ -252,6 +330,7 @@ const HistoryScreen = () => {
             variant="contained"
             startIcon={<BackupIcon />}
             onClick={handleMenuClick}
+            disabled={isLoading || !data}
             sx={{ 
               bgcolor: theme.palette.mode === 'dark' ? 'primary.dark' : 'primary.main',
               '&:hover': {
@@ -292,10 +371,20 @@ const HistoryScreen = () => {
               </ListItemIcon>
               <ListItemText>Export as PDF</ListItemText>
             </MenuItem>
+            <MenuItem onClick={handleRestore}>
+              <ListItemIcon>
+                <UploadIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Restore from Backup</ListItemText>
+            </MenuItem>
           </Menu>
         </Box>
       </Box>
-      {data ? (
+      {isLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : data ? (
         <TableContainer component={Paper} sx={{ bgcolor: 'background.paper', width: '100%' }}>
           <Table>
             <TableHead>
@@ -332,6 +421,47 @@ const HistoryScreen = () => {
           No history available
         </Typography>
       )}
+
+      <Dialog open={restoreDialogOpen} onClose={() => setRestoreDialogOpen(false)}>
+        <DialogTitle>Restore Data from Backup</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2, color: 'text.primary' }}>
+            Please select a JSON backup file to restore your data. This will replace your current data.
+          </Typography>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleRestoreConfirm}
+            style={{ display: 'none' }}
+          />
+          <Button
+            variant="contained"
+            onClick={() => fileInputRef.current?.click()}
+            startIcon={<UploadIcon />}
+          >
+            Select Backup File
+          </Button>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRestoreDialogOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={handleCloseNotification}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseNotification}
+          severity={notification.type}
+          sx={{ width: '100%' }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

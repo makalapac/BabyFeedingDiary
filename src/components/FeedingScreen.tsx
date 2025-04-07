@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Button, TextField, Typography, Paper, useTheme, Snackbar, Alert } from '@mui/material';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
+import { Box, Button, TextField, Typography, Paper, useTheme, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { format } from 'date-fns';
 import { storageService } from '../services/storage';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
@@ -14,6 +15,7 @@ const FeedingScreen = () => {
   } | null>(null);
   const [elapsedTime, setElapsedTime] = useState<string>('00:00');
   const [comment, setComment] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState<{
     open: boolean;
     message: string;
@@ -50,61 +52,85 @@ const FeedingScreen = () => {
     setElapsedTime('00:00');
   };
 
-  const endFeeding = () => {
+  const endFeeding = async () => {
     if (activeFeeding) {
-      const feedingData = {
-        start: format(activeFeeding.start, 'HH:mm'),
-        end: format(new Date(), 'HH:mm'),
-        strana: activeFeeding.side,
-        komentar: comment || null,
-      };
-      
-      const today = format(new Date(), 'd.M.yyyy');
-      storageService.addFeedingSession(today, feedingData);
-      
-      setActiveFeeding(null);
-      setComment('');
-      
-      // Show notification
-      setNotification({
-        open: true,
-        message: `Feeding session ended: ${activeFeeding.side === 'L' ? 'Left' : 'Right'} breast`,
-        type: 'success',
-      });
+      setIsLoading(true);
+      try {
+        const feedingData = {
+          start: format(activeFeeding.start, 'HH:mm'),
+          end: format(new Date(), 'HH:mm'),
+          strana: activeFeeding.side,
+          komentar: comment || null,
+        };
+        
+        const today = format(new Date(), 'd.M.yyyy');
+        await storageService.addFeedingSession(today, feedingData);
+        
+        setActiveFeeding(null);
+        setComment('');
+        
+        // Show notification
+        setNotification({
+          open: true,
+          message: `Feeding session ended: ${activeFeeding.side === 'L' ? 'Left' : 'Right'} breast`,
+          type: 'success',
+        });
+      } catch (error) {
+        console.error('Error saving feeding session:', error);
+        setNotification({
+          open: true,
+          message: 'Error saving feeding session',
+          type: 'error',
+        });
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-  const recordDiaperChange = (type: 'popiškena' | 'pokakana' | 'both') => {
-    const now = new Date();
-    const diaperData = {
-      dogadjaj: 'pelena',
-      vrsta: type,
-      start: format(now, 'HH:mm'),
-      end: format(now, 'HH:mm'),
-    };
-    
-    const today = format(now, 'd.M.yyyy');
-    storageService.addFeedingSession(today, diaperData);
-    
-    // Show notification
-    let message = '';
-    switch (type) {
-      case 'popiškena':
-        message = 'Wet diaper recorded';
-        break;
-      case 'pokakana':
-        message = 'Poopy diaper recorded';
-        break;
-      case 'both':
-        message = 'Both wet and poopy diaper recorded';
-        break;
+  const recordDiaperChange = async (type: 'popiškena' | 'pokakana' | 'both') => {
+    setIsLoading(true);
+    try {
+      const now = new Date();
+      const diaperData = {
+        dogadjaj: 'pelena',
+        vrsta: type,
+        start: format(now, 'HH:mm'),
+        end: format(now, 'HH:mm'),
+      };
+      
+      const today = format(now, 'd.M.yyyy');
+      await storageService.addFeedingSession(today, diaperData);
+      
+      // Show notification
+      let message = '';
+      switch (type) {
+        case 'popiškena':
+          message = 'Wet diaper recorded';
+          break;
+        case 'pokakana':
+          message = 'Poopy diaper recorded';
+          break;
+        case 'both':
+          message = 'Both wet and poopy diaper recorded';
+          break;
+      }
+      
+      setNotification({
+        open: true,
+        message,
+        type: 'info',
+      });
+    } catch (error) {
+      console.error('Error recording diaper change:', error);
+      setNotification({
+        open: true,
+        message: 'Error recording diaper change',
+        type: 'error',
+      });
+    } finally {
+      setIsLoading(false);
     }
-    
-    setNotification({
-      open: true,
-      message,
-      type: 'info',
-    });
   };
 
   const handleCloseNotification = () => {
@@ -152,6 +178,7 @@ const FeedingScreen = () => {
               <Button
                 variant="contained"
                 size="large"
+                disabled={isLoading}
                 sx={{
                   width: 150,
                   height: 150,
@@ -169,6 +196,7 @@ const FeedingScreen = () => {
               <Button
                 variant="contained"
                 size="large"
+                disabled={isLoading}
                 sx={{
                   width: 150,
                   height: 150,
@@ -213,6 +241,7 @@ const FeedingScreen = () => {
                 variant="contained"
                 size="large"
                 startIcon={<WaterDropIcon />}
+                disabled={isLoading}
                 sx={{
                   width: 120,
                   height: 120,
@@ -225,12 +254,13 @@ const FeedingScreen = () => {
                 }}
                 onClick={() => recordDiaperChange('popiškena')}
               >
-                Wet
+                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Wet'}
               </Button>
               <Button
                 variant="contained"
                 size="large"
                 startIcon={<LocalFireDepartmentIcon />}
+                disabled={isLoading}
                 sx={{
                   width: 120,
                   height: 120,
@@ -243,12 +273,13 @@ const FeedingScreen = () => {
                 }}
                 onClick={() => recordDiaperChange('pokakana')}
               >
-                Poop
+                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Poop'}
               </Button>
               <Button
                 variant="contained"
                 size="large"
                 startIcon={<AllInclusiveIcon />}
+                disabled={isLoading}
                 sx={{
                   width: 120,
                   height: 120,
@@ -261,7 +292,7 @@ const FeedingScreen = () => {
                 }}
                 onClick={() => recordDiaperChange('both')}
               >
-                Both
+                {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Both'}
               </Button>
             </Box>
           </Paper>
@@ -307,6 +338,7 @@ const FeedingScreen = () => {
             variant="contained"
             color="secondary"
             onClick={endFeeding}
+            disabled={isLoading}
             fullWidth
             sx={{
               bgcolor: theme.palette.mode === 'dark' ? 'secondary.dark' : 'secondary.main',
@@ -316,7 +348,7 @@ const FeedingScreen = () => {
               borderRadius: 2,
             }}
           >
-            End Feeding
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : 'End Feeding'}
           </Button>
         </Paper>
       )}
