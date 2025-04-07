@@ -9,7 +9,10 @@ export interface FeedingSession {
 
 export interface DiaperEvent {
   dogadjaj: 'pelena';
-  vrsta: 'pokakana' | 'popiškena' | 'pokakana (malo)';
+  vrsta: 'pokakana' | 'popiškena' | 'both';
+  start?: string;
+  end?: string;
+  komentar?: string | null;
 }
 
 export interface WeightMeasurement {
