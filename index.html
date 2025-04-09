@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/BabyFeedingDiary/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#3f51b5" />
+    <meta name="description" content="Track breastfeeding, diapers, and baby weight" />
+    <link rel="manifest" href="/BabyFeedingDiary/manifest.json" />
+    <link rel="apple-touch-icon" href="/BabyFeedingDiary/icons/icon-192x192.png" />
+    <title>Baby Feeding Diary</title>
+    <script type="module" crossorigin src="/BabyFeedingDiary/assets/index-1488c52b.js"></script>
+    <link rel="stylesheet" href="/BabyFeedingDiary/assets/index-35ecf319.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/BabyFeedingDiary/service-worker.js', {
+            scope: '/BabyFeedingDiary/'
+          })
+            .then(registration => {
+              console.log('ServiceWorker registration successful');
+            })
+            .catch(err => {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+      }
+    </script>
+  </body>
+</html> 
