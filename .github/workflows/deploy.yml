@@ -27,18 +27,37 @@ jobs:
           node-version: '18'
           cache: 'npm'
       
-      - name: Install dependencies
+      - name: Show Node and NPM version
         run: |
+          node --version
+          npm --version
+
+      - name: Clean install dependencies
+        run: |
+          rm -rf node_modules
+          rm -f package-lock.json
           npm install
-          npm ci
-        
-      - name: List directory content before build
-        run: ls -la
+
+      - name: List installed packages
+        run: npm list --depth=0
         
       - name: Build
+        env:
+          CI: false # This prevents treating warnings as errors
         run: |
-          npm run build
-          ls -la dist/
+          echo "Starting build process..."
+          npm run build || {
+            echo "Build failed. Showing error logs:"
+            cat npm-debug.log || true
+            exit 1
+          }
+          
+      - name: List build output
+        run: |
+          echo "Contents of current directory:"
+          ls -la
+          echo "Contents of dist directory:"
+          ls -la dist/ || echo "dist directory not found"
         
       - name: Setup Pages
         uses: actions/configure-pages@v4

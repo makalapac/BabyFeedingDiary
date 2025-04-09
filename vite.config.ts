@@ -11,6 +11,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    assetsDir: 'assets',
+    emptyOutDir: true,
   },
   base: '/BabyFeedingDiary/',
 }); 
