@@ -5,12 +5,16 @@ import './index.css';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').then(
+    const swUrl = import.meta.env.MODE === 'production' 
+      ? '/BabyFeedingDiary/service-worker.js'
+      : '/service-worker.js';
+
+    navigator.serviceWorker.register(swUrl).then(
       (registration) => {
-        console.log('ServiceWorker registration successful');
+        console.log('ServiceWorker registration successful:', registration.scope);
       },
       (err) => {
-        console.log('ServiceWorker registration failed: ', err);
+        console.error('ServiceWorker registration failed:', err);
       }
     );
   });
